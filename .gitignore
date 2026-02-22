@@ -1,2 +1,15 @@
-/agent/target
+# Rust build artifacts
+/target
+**/target
+
+# Backups
 **/*.rs.bk
+
+# Node / frontend (future)
+node_modules
+
+# Environment files
+.env
+
+# Logs
+*.log
