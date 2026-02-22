@@ -1,19 +1,28 @@
+use crate::identity::NodeKeys;
+use ed25519_dalek::Signer;
 use log::info;
-use std::thread;
-use std::time::Duration;
+use std::{thread, time::Duration};
 
-use crate::config::Config;
+pub fn run(node_name: String, version: String, interval: u64) {
+    let keys: NodeKeys = crate::identity::load_or_generate();
 
-pub fn run(cfg: &Config) {
-    info!("Runtime core initialized for node: {}", cfg.node_name);
+    info!("Orpheus OS Agent booting...");
 
     loop {
-        info!(
-            "Agent heartbeat — node: {}, interval: {} seconds",
-            cfg.node_name,
-            cfg.interval_seconds
+        let payload = format!(
+            "node={},version={}",
+            node_name,
+            version
         );
 
-        thread::sleep(Duration::from_secs(cfg.interval_seconds));
+        let signature = keys.signing_key.sign(payload.as_bytes());
+
+        info!(
+            "Heartbeat | payload: {} | signature: {}",
+            payload,
+            hex::encode(signature.to_bytes())
+        );
+
+        thread::sleep(Duration::from_secs(interval));
     }
 }

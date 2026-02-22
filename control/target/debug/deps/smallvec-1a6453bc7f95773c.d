@@ -1,0 +1,7 @@
+/home/user/orpheus-os/control/target/debug/deps/smallvec-1a6453bc7f95773c.d: /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/smallvec-1.15.1/src/lib.rs
+
+/home/user/orpheus-os/control/target/debug/deps/libsmallvec-1a6453bc7f95773c.rlib: /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/smallvec-1.15.1/src/lib.rs
+
+/home/user/orpheus-os/control/target/debug/deps/libsmallvec-1a6453bc7f95773c.rmeta: /home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/smallvec-1.15.1/src/lib.rs
+
+/home/user/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/smallvec-1.15.1/src/lib.rs:

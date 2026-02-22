@@ -1,15 +1,14 @@
-mod logger;
-mod config;
+mod identity;
 mod core;
 
 use log::info;
 
 fn main() {
-    logger::init();
+    env_logger::init();
 
-    info!("Orpheus OS Agent booting...");
+    let node_name = "orpheus-node-1".to_string();
+    let version = "0.1.0".to_string();
+    let interval = 5;
 
-    let cfg = config::load_config("config.yaml");
-
-    core::run(&cfg);
+    core::run(node_name, version, interval);
 }

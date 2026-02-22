@@ -1,0 +1,42 @@
+use axum::{
+    routing::post,
+    Router,
+    Json,
+};
+use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Heartbeat {
+    node: String,
+    version: String,
+    uptime: u64,
+    public_key: String,
+    signature: String,
+}
+
+async fn heartbeat_handler(
+    Json(payload): Json<Heartbeat>,
+) -> String {
+    println!("📩 Received heartbeat:");
+    println!("{:#?}", payload);
+
+    "OK".to_string()
+}
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new()
+        .route("/heartbeat", post(heartbeat_handler));
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+
+    println!("🚀 Control server running on http://{}", addr);
+
+    axum::serve(
+        tokio::net::TcpListener::bind(addr).await.unwrap(),
+        app,
+    )
+    .await
+    .unwrap();
+}
