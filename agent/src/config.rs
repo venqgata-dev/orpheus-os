@@ -1,16 +1,16 @@
 use serde::Deserialize;
 use std::fs;
+use std::error::Error;
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
+pub struct AgentConfig {
     pub node_name: String,
-    pub interval_seconds: u64,
+    pub environment: String,
+    pub log_level: String,
 }
 
-pub fn load_config(path: &str) -> Config {
-    let contents = fs::read_to_string(path)
-        .expect("Failed to read config file");
-
-    serde_yaml::from_str(&contents)
-        .expect("Failed to parse YAML config")
+pub fn load_config() -> Result<AgentConfig, Box<dyn Error>> {
+    let contents = fs::read_to_string("config.yaml")?;
+    let config: AgentConfig = serde_yaml::from_str(&contents)?;
+    Ok(config)
 }

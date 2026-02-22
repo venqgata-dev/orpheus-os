@@ -1,14 +1,23 @@
 mod identity;
-mod core;
+mod config;
 
-use log::info;
+use std::error::Error;
+use log::{info, warn};
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
-    let node_name = "orpheus-node-1".to_string();
-    let version = "0.1.0".to_string();
-    let interval = 5;
+    info!("Starting Orpheus Agent v0.1...");
 
-    core::run(node_name, version, interval);
+    let node = identity::load_or_create_identity()?;
+    info!("Node ID: {}", node.id());
+
+    let config = config::load_config()?;
+    info!("Node Name: {}", config.node_name);
+    info!("Environment: {}", config.environment);
+    info!("Log Level: {}", config.log_level);
+
+    info!("Orpheus Agent ready.");
+
+    Ok(())
 }

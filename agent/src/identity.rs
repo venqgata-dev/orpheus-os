@@ -2,33 +2,39 @@ use ed25519_dalek::{SigningKey, VerifyingKey};
 use rand_core::OsRng;
 use std::fs;
 use std::path::Path;
+use std::error::Error;
 
 const KEY_PATH: &str = "node_key";
 
-pub struct NodeKeys {
-    pub signing_key: SigningKey,
-    pub verifying_key: VerifyingKey,
+pub struct NodeIdentity {
+    signing_key: SigningKey,
+    verifying_key: VerifyingKey,
 }
 
-pub fn load_or_generate() -> NodeKeys {
+impl NodeIdentity {
+    pub fn id(&self) -> String {
+        hex::encode(self.verifying_key.to_bytes())
+    }
+}
+
+pub fn load_or_create_identity() -> Result<NodeIdentity, Box<dyn Error>> {
     if Path::new(KEY_PATH).exists() {
-        let hex_data =
-            fs::read_to_string(KEY_PATH).expect("Failed to read key file");
+        let hex_data = fs::read_to_string(KEY_PATH)?;
+        let bytes = hex::decode(hex_data.trim())?;
 
-        let bytes =
-            hex::decode(hex_data.trim()).expect("Invalid hex in key file");
+        let key_bytes: [u8; 32] = bytes
+            .try_into()
+            .map_err(|_| "Invalid key length")?;
 
-        let signing_key =
-            SigningKey::from_bytes(&bytes.try_into().unwrap());
-
+        let signing_key = SigningKey::from_bytes(&key_bytes);
         let verifying_key = signing_key.verifying_key();
 
         println!("Loaded existing node identity.");
 
-        NodeKeys {
+        Ok(NodeIdentity {
             signing_key,
             verifying_key,
-        }
+        })
     } else {
         println!("Generating new node identity...");
 
@@ -36,14 +42,12 @@ pub fn load_or_generate() -> NodeKeys {
         let signing_key = SigningKey::generate(&mut csprng);
         let verifying_key = signing_key.verifying_key();
 
-        let hex_string = hex::encode(signing_key.to_bytes());
+        let hex_key = hex::encode(signing_key.to_bytes());
+        fs::write(KEY_PATH, hex_key)?;
 
-        fs::write(KEY_PATH, hex_string)
-            .expect("Failed to write key file");
-
-        NodeKeys {
+        Ok(NodeIdentity {
             signing_key,
             verifying_key,
-        }
+        })
     }
 }
