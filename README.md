@@ -1,107 +1,161 @@
-Orpheus OS
+# Orpheus OS
 
-Open-Source AI Verification & Digital Sovereignty Infrastructure
+> A programmable policy-enforcement and AI-verification control layer
+> for infrastructure.
 
-Orpheus OS is an open-source AI verification and governance layer designed to enforce policy, audit behavior, and enable sovereign control over AI systems.
+Orpheus OS is not a traditional operating system. It is an
+infrastructure control plane designed to enforce deterministic policy
+execution, auditability, and AI-governed verification across distributed
+systems.
 
-It is not a traditional operating system.
+------------------------------------------------------------------------
 
-It is a lightweight infrastructure control layer that runs on top of Linux and containerized environments.
+## 🚀 Vision
 
-Vision
+Modern infrastructure lacks deterministic enforcement when AI agents
+interact with production systems.
 
-The future problem is not building AI.
+Orpheus OS provides:
 
-The future problem is trusting AI.
+-   Policy enforcement at execution boundaries
+-   AI decision verification
+-   Immutable audit trails
+-   Deterministic execution guarantees
+-   Secure agent orchestration
 
-Orpheus OS exists to:
+------------------------------------------------------------------------
 
-Verify AI behavior
+## 🏗 Architecture Overview
 
-Enforce runtime policies
+Orpheus OS consists of:
 
-Provide immutable audit trails
+-   **Agent Layer** -- Handles policy-aware task execution
+-   **Policy Engine** -- Validates actions against deterministic rules
+-   **Audit Logger** -- Immutable execution logging
+-   **Verification Layer** -- AI validation and consensus enforcement
 
-Enable sovereign AI infrastructure
+Execution flow:
 
-Support enterprise and national digital sovereignty
+1.  Agent receives instruction
+2.  Policy engine validates request
+3.  Execution is sandboxed
+4.  Action is logged immutably
+5.  Verification layer confirms integrity
 
-Core Principles
+------------------------------------------------------------------------
 
-Open Source First
+## 📦 Project Structure
 
-Cloud Agnostic
+    orpheus-os/
+    ├── agent/
+    │   └── src/
+    ├── tests/
+    ├── .github/workflows/
+    ├── Cargo.toml
+    └── README.md
 
-Model Agnostic
+------------------------------------------------------------------------
 
-Lightweight by Design
+## ⚙ Installation
 
-Security by Default
+### Prerequisites
 
-Transparent & Auditable
+-   Rust (stable toolchain)
+-   Cargo
 
-What Orpheus OS Does
+Install Rust:
 
-Orpheus acts as a verification layer between AI workloads and infrastructure.
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-It can:
+Clone the repository:
 
-Sandbox AI models in containers
+    git clone https://github.com/venqgata-dev/orpheus-os.git
+    cd orpheus-os
 
-Enforce runtime policies (network, data access, execution boundaries)
+Build the project:
 
-Log prompts and outputs securely
+    cargo build --workspace
 
-Hash and store immutable audit records
+Run tests:
 
-Operate in air-gapped environments
+    cargo test
 
-Scale across nodes
+------------------------------------------------------------------------
 
-Architecture (v0.1 Concept)
+## 🧪 Development
 
-Linux Host
-→ Container Runtime (Docker / Podman)
-→ Orpheus Agent
-→ Policy Engine
-→ Audit Logger
+Format code:
 
-v0.1 Roadmap
+    cargo fmt
 
-Initial prototype includes:
+Lint:
 
-Rust-based Orpheus Agent
+    cargo clippy -- -D warnings
 
-YAML-based policy enforcement
+Run locally:
 
-Container workload monitoring
+    cargo run
 
-SQLite audit logging
+------------------------------------------------------------------------
 
-CLI management interface
+## 🔐 Security Model
 
-Long-Term Direction
+Orpheus OS enforces:
 
-Future versions aim to support:
+-   Deterministic policy validation
+-   Sandboxed execution contexts
+-   Immutable logging
+-   Explicit AI decision boundaries
+-   Least-privilege execution
 
-Multi-node orchestration
+------------------------------------------------------------------------
 
-Kubernetes integration
+## 🛣 Roadmap
 
-Enterprise dashboard
+-   [ ] Core policy engine implementation
+-   [ ] Deterministic rule DSL
+-   [ ] Audit logging persistence layer
+-   [ ] Agent sandboxing runtime
+-   [ ] CLI interface
+-   [ ] Distributed node coordination
+-   [ ] Formal verification integration
 
-Cryptographic log verification
+------------------------------------------------------------------------
 
-Sovereign infrastructure deployments
+## 🤝 Contributing
 
-Why "Orpheus"?
+Contributions are welcome.
 
-Named after the mythological figure Orpheus — symbol of knowledge, creation, and descent into complexity — this project represents the effort to bring clarity, verification, and trust to AI systems.
+1.  Fork the repository
+2.  Create a feature branch
+3.  Commit changes with clear messages
+4.  Open a Pull Request
 
-License
+Before submitting:
 
-This project will be released under an open-source license (TBD).
+-   Ensure `cargo fmt` passes
+-   Ensure `cargo clippy` has no warnings
+-   Add tests for new features
 
-Status
+------------------------------------------------------------------------
 
-Early development – v0.1 prototype phase.# Orpheus OS
+## 📄 License
+
+This project is licensed under the MIT License (recommended). Add a
+LICENSE file in the root directory.
+
+------------------------------------------------------------------------
+
+## ⚠ Disclaimer
+
+Orpheus OS is currently in early-stage development and should not be
+used in production environments without full audit and review.
+
+------------------------------------------------------------------------
+
+## 🌌 Philosophy
+
+Infrastructure should be deterministic. AI systems should be verifiable.
+Execution must be auditable.
+
+Orpheus OS exists to enforce that boundary.
