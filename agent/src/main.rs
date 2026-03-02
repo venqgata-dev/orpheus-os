@@ -3,16 +3,12 @@ mod config;
 
 use std::error::Error;
 use std::sync::Arc;
+use std::time::Duration;
 
-use axum::{
-    routing::get,
-    Router,
-    extract::State,
-    response::Json,
-};
+use axum::{routing::get, Router, extract::State, response::Json};
 use log::info;
 use serde::Serialize;
-use tokio::{net::TcpListener, signal};
+use tokio::{net::TcpListener, signal, task, time};
 
 #[derive(Clone)]
 struct AppState {
@@ -42,6 +38,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         node_id: node.id(),
         node_name: config.node_name.clone(),
         environment: config.environment.clone(),
+    });
+
+    // Spawn heartbeat background task
+    let heartbeat_state = state.clone();
+    task::spawn(async move {
+        loop {
+            info!(
+                "Heartbeat | node={} | env={}",
+                heartbeat_state.node_id,
+                heartbeat_state.environment
+            );
+            time::sleep(Duration::from_secs(10)).await;
+        }
     });
 
     let app = Router::new()
