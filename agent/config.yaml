@@ -1,3 +1,9 @@
 node_name: orpheus-node-01
 environment: development
 log_level: info
+
+policy:
+  allow_environments:
+    - development
+    - staging
+  max_payload_size: 1024
