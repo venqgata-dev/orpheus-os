@@ -13,3 +13,7 @@ node_modules
 
 # Logs
 *.log
+
+# Orpheus runtime artifacts
+orpheus_audit.db
+node_key
