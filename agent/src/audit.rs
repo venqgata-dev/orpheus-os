@@ -1,109 +1,167 @@
+use rusqlite::{params, Connection};
 use sha2::{Digest, Sha256};
-use std::fs::{read_to_string, OpenOptions};
-use std::io::Write;
-use serde::{Serialize, Deserialize};
 use chrono::Utc;
-use std::error::Error;
+use std::sync::Mutex;
+use serde::Serialize;
+use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+use hex;
 
-#[derive(Serialize, Deserialize)]
-struct LedgerEntry {
-    timestamp: String,
-    node_id: String,
-    environment: String,
-    prompt_hash: String,
-    allowed: bool,
-    prev_hash: String,
-    entry_hash: String,
+#[derive(Serialize, Clone)]
+pub struct AuditRecord {
+    pub id: i64,
+    pub timestamp: String,
+    pub environment: String,
+    pub payload_size: i64,
+    pub allowed: bool,
+    pub message: String,
+    pub previous_hash: String,
+    pub hash: String,
+    pub signature: String,
 }
 
-fn sha256_hex(data: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(data.as_bytes());
-    hex::encode(hasher.finalize())
+pub struct AuditLogger {
+    conn: Mutex<Connection>,
+    signing_key: SigningKey,
+    verifying_key: VerifyingKey,
 }
 
-fn get_last_hash() -> String {
-    if let Ok(contents) = read_to_string("audit.log") {
-        if let Some(last_line) = contents.lines().last() {
-            if let Ok(entry) = serde_json::from_str::<LedgerEntry>(last_line) {
-                return entry.entry_hash;
+impl AuditLogger {
+
+    pub fn new(signing_key: SigningKey) -> Self {
+
+        let verifying_key = signing_key.verifying_key();
+
+        let conn = Connection::open("orpheus_audit.db")
+            .expect("Failed to open audit database");
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                environment TEXT NOT NULL,
+                payload_size INTEGER NOT NULL,
+                allowed INTEGER NOT NULL,
+                message TEXT NOT NULL,
+                previous_hash TEXT NOT NULL,
+                hash TEXT NOT NULL,
+                signature TEXT NOT NULL
+            )",
+            [],
+        ).expect("Failed to create audit table");
+
+        Self {
+            conn: Mutex::new(conn),
+            signing_key,
+            verifying_key,
+        }
+    }
+
+    pub fn log_event(
+        &self,
+        environment: &str,
+        payload_size: usize,
+        allowed: bool,
+        message: &str,
+    ) {
+
+        let timestamp = Utc::now().to_rfc3339();
+        let conn = self.conn.lock().unwrap();
+
+        let previous_hash: String = conn.query_row(
+            "SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1",
+            [],
+            |row| row.get(0),
+        ).unwrap_or_else(|_| "GENESIS".to_string());
+
+        let mut hasher = Sha256::new();
+
+        hasher.update(previous_hash.as_bytes());
+        hasher.update(timestamp.as_bytes());
+        hasher.update(environment.as_bytes());
+        hasher.update(payload_size.to_string().as_bytes());
+        hasher.update(if allowed { b"1" } else { b"0" });
+        hasher.update(message.as_bytes());
+
+        let hash = format!("{:x}", hasher.finalize());
+
+        let signature: Signature = self.signing_key.sign(hash.as_bytes());
+        let signature_hex = hex::encode(signature.to_bytes());
+
+        conn.execute(
+            "INSERT INTO audit_log
+            (timestamp, environment, payload_size, allowed, message, previous_hash, hash, signature)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                timestamp,
+                environment,
+                payload_size as i64,
+                if allowed { 1 } else { 0 },
+                message,
+                previous_hash,
+                hash,
+                signature_hex
+            ],
+        ).expect("Insert failed");
+    }
+
+    pub fn get_recent(&self, limit: i64) -> Vec<AuditRecord> {
+
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp, environment, payload_size, allowed, message, previous_hash, hash, signature
+             FROM audit_log
+             ORDER BY id DESC
+             LIMIT ?1"
+        ).unwrap();
+
+        let rows = stmt.query_map(params![limit], |row| {
+
+            Ok(AuditRecord {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                environment: row.get(2)?,
+                payload_size: row.get(3)?,
+                allowed: row.get::<_, i64>(4)? == 1,
+                message: row.get(5)?,
+                previous_hash: row.get(6)?,
+                hash: row.get(7)?,
+                signature: row.get(8)?,
+            })
+
+        }).unwrap();
+
+        rows.map(|r| r.unwrap()).collect()
+    }
+
+    pub fn verify_signatures(&self) -> bool {
+
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT hash, signature FROM audit_log"
+        ).unwrap();
+
+        let rows = stmt.query_map([], |row| {
+
+            let hash: String = row.get(0)?;
+            let signature: String = row.get(1)?;
+            Ok((hash, signature))
+
+        }).unwrap();
+
+        for row in rows {
+
+            let (hash, signature_hex) = row.unwrap();
+
+            let sig_bytes = hex::decode(signature_hex).unwrap();
+            let sig = Signature::from_slice(&sig_bytes).unwrap();
+
+            if self.verifying_key.verify(hash.as_bytes(), &sig).is_err() {
+                return false;
             }
         }
+
+        true
     }
-    "GENESIS".to_string()
-}
-
-pub fn log_verification(
-    node_id: &str,
-    environment: &str,
-    prompt: &str,
-    allowed: bool,
-) -> Result<(), Box<dyn Error>> {
-
-    let prompt_hash = sha256_hex(prompt);
-    let prev_hash = get_last_hash();
-
-    let entry_core = format!(
-        "{}{}{}{}{}",
-        node_id, environment, prompt_hash, allowed, prev_hash
-    );
-
-    let entry_hash = sha256_hex(&entry_core);
-
-    let entry = LedgerEntry {
-        timestamp: Utc::now().to_rfc3339(),
-        node_id: node_id.to_string(),
-        environment: environment.to_string(),
-        prompt_hash,
-        allowed,
-        prev_hash,
-        entry_hash,
-    };
-
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("audit.log")?;
-
-    writeln!(file, "{}", serde_json::to_string(&entry)?)?;
-
-    Ok(())
-}
-
-pub fn verify_ledger() -> Result<bool, Box<dyn Error>> {
-
-    let contents = match read_to_string("audit.log") {
-        Ok(c) => c,
-        Err(_) => return Ok(true), // empty ledger = valid
-    };
-
-    let mut previous_hash = "GENESIS".to_string();
-
-    for line in contents.lines() {
-
-        let entry: LedgerEntry = serde_json::from_str(line)?;
-
-        if entry.prev_hash != previous_hash {
-            return Ok(false);
-        }
-
-        let entry_core = format!(
-            "{}{}{}{}{}",
-            entry.node_id,
-            entry.environment,
-            entry.prompt_hash,
-            entry.allowed,
-            entry.prev_hash
-        );
-
-        let recalculated_hash = sha256_hex(&entry_core);
-
-        if recalculated_hash != entry.entry_hash {
-            return Ok(false);
-        }
-
-        previous_hash = entry.entry_hash;
-    }
-
-    Ok(true)
 }

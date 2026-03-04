@@ -1,95 +1,61 @@
-use axum::{
-    extract::State,
-    routing::{get, post},
-    Router,
-};
+use axum::{routing::get, routing::post, Json, Router};
+use ed25519_dalek::SigningKey;
+use rand::rngs::OsRng;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-mod config;
-mod core;
-mod identity;
-mod logger;
-mod middleware;
-mod policy;
+mod audit;
+use audit::{AuditLogger, RootResponse};
 
-use core::AppState;
+#[derive(Deserialize)]
+struct ValidateRequest {
+    environment: String,
+    payload_size: u64,
+}
+
+#[derive(Serialize)]
+struct ValidateResponse {
+    allowed: bool,
+    message: String,
+}
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    logger::init();
+async fn main() {
+    // Generate node key
+    let signing_key = SigningKey::generate(&mut OsRng);
 
-    log::info!("Starting Orpheus Agent v0.1...");
+    let audit_logger = Arc::new(AuditLogger::new(signing_key));
 
-    let identity = identity::load_or_create_identity()?;
-    let config = config::load_config()?;
-
-    let state = Arc::new(AppState::new(identity.clone(), config.clone()));
-
-    log::info!("Loaded existing node identity.");
-    log::info!("Node ID: {}", identity.id());
-    log::info!("HTTP server running on http://127.0.0.1:8080");
-
-    // Heartbeat task
-    let heartbeat_state = state.clone();
-    tokio::spawn(async move {
-        loop {
-            log::info!(
-                "Heartbeat: node={} env={}",
-                heartbeat_state.identity.id(),
-                heartbeat_state.config.environment
-            );
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        }
-    });
-
-    // ---- ROUTER ----
     let app = Router::new()
-        .route("/health", get(health))
-        .route("/info", get(info))
-        .route("/execute", post(execute))
-        .with_state(state.clone())
-        .layer(
-            axum::middleware::from_fn_with_state(
-                state.clone(),
-                middleware::policy_middleware,
-            ),
-        );
+        .route("/validate", post(validate))
+        .route("/audit/root", get(get_root))
+        .with_state(audit_logger);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-    let listener = TcpListener::bind(addr).await?;
+    println!("HTTP server running on http://{}", addr);
 
-    tokio::select! {
-        _ = axum::serve(listener, app) => {},
-        _ = shutdown_signal() => {
-            log::info!("Shutdown signal received.");
-        }
-    }
-
-    log::info!("Orpheus Agent shut down cleanly.");
-    Ok(())
+    let listener = TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 
-async fn health() -> &'static str {
-    "OK"
-}
+async fn validate(
+    axum::extract::State(audit): axum::extract::State<Arc<AuditLogger>>,
+    Json(req): Json<ValidateRequest>,
+) -> Json<ValidateResponse> {
+    let payload = format!("{}:{}", req.environment, req.payload_size);
 
-async fn info(State(state): State<Arc<AppState>>) -> String {
-    serde_json::json!({
-        "node_id": state.identity.id(),
-        "node_name": state.config.node_name,
-        "environment": state.config.environment
+    audit.record_event(&payload);
+
+    Json(ValidateResponse {
+        allowed: true,
+        message: "Validation successful".into(),
     })
-    .to_string()
 }
 
-async fn execute() -> &'static str {
-    "Execution allowed"
-}
-
-async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("Failed to install Ctrl+C handler");
+async fn get_root(
+    axum::extract::State(audit): axum::extract::State<Arc<AuditLogger>>,
+) -> Json<RootResponse> {
+    Json(audit.get_root())
 }
