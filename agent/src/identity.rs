@@ -1,48 +1,70 @@
-use ed25519_dalek::{SigningKey, VerifyingKey};
-use rand_core::OsRng;
+use ed25519_dalek::SigningKey;
+use rand::rngs::OsRng;
+use sha2::{Digest, Sha256};
+
 use std::fs;
 use std::path::Path;
-use hex;
-use std::error::Error;
 
 pub struct NodeIdentity {
     signing_key: SigningKey,
+    node_id: String,
 }
 
 impl NodeIdentity {
+
     pub fn id(&self) -> String {
-        let verifying_key: VerifyingKey = self.signing_key.verifying_key();
-        hex::encode(verifying_key.to_bytes())
+        self.node_id.clone()
     }
 
-    pub fn signing_key(&self) -> SigningKey {
-        self.signing_key.clone()
+    pub fn signing_key(&self) -> &SigningKey {
+        &self.signing_key
     }
+
 }
 
-pub fn load_or_create_identity() -> Result<NodeIdentity, Box<dyn Error>> {
-    let path = "node_key";
+pub fn load_or_create_identity() -> Result<NodeIdentity, Box<dyn std::error::Error>> {
 
-    if Path::new(path).exists() {
-        let key_bytes = fs::read(path)?;
+    // Read PORT so each node has its own identity
+    let port = std::env::var("PORT").unwrap_or("8080".to_string());
 
-        if key_bytes.len() != 32 {
-            return Err("Invalid key length".into());
-        }
+    let key_path = format!("src/node_key_{}", port);
 
-        let key_array: [u8; 32] = key_bytes
+    let signing_key: SigningKey;
+
+    if Path::new(&key_path).exists() {
+
+        let bytes = fs::read(&key_path)?;
+
+        // Convert Vec<u8> to [u8; 32]
+        let key_bytes: [u8; 32] = bytes
             .try_into()
-            .map_err(|_| "Failed to convert key bytes")?;
+            .expect("invalid key length");
 
-        let signing_key = SigningKey::from_bytes(&key_array);
+        signing_key = SigningKey::from_bytes(&key_bytes);
 
-        Ok(NodeIdentity { signing_key })
     } else {
+
         let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
 
-        fs::write(path, signing_key.to_bytes())?;
+        signing_key = SigningKey::generate(&mut csprng);
 
-        Ok(NodeIdentity { signing_key })
+        fs::write(&key_path, signing_key.to_bytes())?;
+
     }
+
+    // Create node ID from public key hash
+    let public_key = signing_key.verifying_key().to_bytes();
+
+    let mut hasher = Sha256::new();
+
+    hasher.update(public_key);
+
+    let result = hasher.finalize();
+
+    let node_id = hex::encode(result)[0..64].to_string();
+
+    Ok(NodeIdentity {
+        signing_key,
+        node_id,
+    })
 }

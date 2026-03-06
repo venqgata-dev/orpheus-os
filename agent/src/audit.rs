@@ -164,4 +164,20 @@ impl AuditLogger {
 
         true
     }
+
+    pub fn chain_head(&self) -> (String, i64) {
+
+        let conn = self.conn.lock().unwrap();
+
+        let result: Result<(String, i64), _> = conn.query_row(
+            "SELECT hash, id FROM audit_log ORDER BY id DESC LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        );
+
+        match result {
+            Ok(v) => v,
+            Err(_) => ("GENESIS".to_string(), 0),
+        }
+    }
 }

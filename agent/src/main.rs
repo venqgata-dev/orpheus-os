@@ -27,7 +27,6 @@ struct AppState {
     node_id: String,
     node_name: String,
     environment: String,
-
     policy_engine: Arc<PolicyEngine>,
     audit: Arc<AuditLogger>,
 }
@@ -43,6 +42,13 @@ struct InfoResponse {
     node_name: String,
     environment: String,
     status: String,
+}
+
+#[derive(Serialize)]
+struct ChainHeadResponse {
+    node_id: String,
+    chain_head: String,
+    records: i64,
 }
 
 #[derive(Deserialize)]
@@ -83,11 +89,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         audit,
     });
 
-    // Background heartbeat task
+    // Heartbeat background task
     let heartbeat_state = state.clone();
 
     task::spawn(async move {
         loop {
+
             info!(
                 "Heartbeat | node={} | env={}",
                 heartbeat_state.node_id,
@@ -105,11 +112,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/validate", post(validate))
         .route("/audit/recent", get(audit_recent))
         .route("/audit/verify-signatures", get(audit_verify_signatures))
+        .route("/audit/chain-head", get(chain_head))
         .with_state(state);
 
-    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    // Read PORT from environment
+    let port = std::env::var("PORT").unwrap_or("8080".to_string());
 
-    info!("HTTP server running on http://127.0.0.1:8080");
+    let address = format!("127.0.0.1:{}", port);
+
+    let listener = TcpListener::bind(&address).await?;
+
+    info!("HTTP server running on http://{}", address);
 
     tokio::select! {
         _ = axum::serve(listener, app) => {},
@@ -186,5 +199,18 @@ async fn audit_verify_signatures(
 
     Json(VerifyResponse {
         valid: state.audit.verify_signatures(),
+    })
+}
+
+async fn chain_head(
+    State(state): State<Arc<AppState>>,
+) -> Json<ChainHeadResponse> {
+
+    let (hash, id) = state.audit.chain_head();
+
+    Json(ChainHeadResponse {
+        node_id: state.node_id.clone(),
+        chain_head: hash,
+        records: id,
     })
 }

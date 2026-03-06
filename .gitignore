@@ -1,12 +1,11 @@
 # Rust build artifacts
-/target
-**/target
+target/
 
-# Backups
-**/*.rs.bk
+# Rust lock files (optional for libraries)
+Cargo.lock
 
-# Node / frontend (future)
-node_modules
+# Databases
+*.db
 
 # Environment files
 .env
@@ -14,6 +13,12 @@ node_modules
 # Logs
 *.log
 
-# Orpheus runtime artifacts
-orpheus_audit.db
-node_key
+# Node / frontend (future)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.rs.bk
